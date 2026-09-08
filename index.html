@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Save editor for .rxdata files</title>
+<style>
+:root {
+  --ground: #e6e9ef; --panel: #ffffff; --ink: #161e2b; --muted: #5b6879;
+  --rule: #d3d9e2; --rule-strong: #b9c2ce; --action: #4a32a8; --action-hover: #3a2686;
+  --changed-ink: #8a5300; --changed-bg: #fff3d9; --changed-edge: #d99b1f;
+  --danger: #9e2117; --danger-bg: #fbeae8;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans);
+  font-size: 15px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.shell { max-width: 1080px; margin: 0 auto; padding: 24px 20px 120px; }
+a { color: var(--action); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--action); outline-offset: 2px; }
+.masthead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.masthead h1 { font-size: 19px; font-weight: 620; letter-spacing: -0.01em; margin: 0; }
+.masthead p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.readout { font-family: var(--mono); font-size: 13px; background: var(--ink); color: #dfe5ee;
+  border-radius: 3px; padding: 12px 14px; margin-bottom: 18px; overflow-x: auto; white-space: nowrap; }
+.readout b { color: #fff; font-weight: 600; }
+.readout .sep { color: #6b7a90; padding: 0 10px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; margin-bottom: 18px; }
+.panel > h2 { font-size: 14px; font-weight: 620; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.panel-body { padding: 16px; }
+.panel-note { padding: 0 16px 14px; color: var(--muted); font-size: 13px; margin: 0; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 16px; border-bottom: 1px solid var(--rule); }
+td { padding: 7px 16px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+.row.changed td { background: var(--changed-bg); }
+.row.changed td:first-child { box-shadow: inset 3px 0 0 var(--changed-edge); }
+tr.muted td { opacity: 0.55; }
+.name { font-weight: 520; }
+.name a { text-decoration: none; }
+.name a:hover { text-decoration: underline; }
+.type { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.value-mono { font-family: var(--mono); font-size: 13px; color: var(--muted); word-break: break-word; }
+.offset { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.offset-hex { display: block; }
+.was { display: block; font-family: var(--mono); font-size: 12px; color: var(--changed-ink); }
+.was-inline { text-decoration: line-through; }
+.arrow { color: var(--muted); }
+.field-error { display: none; font-size: 12px; color: var(--danger); }
+.field-error.showing { display: block; }
+.path { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.path a { color: var(--muted); text-decoration: none; }
+.path a:hover { color: var(--action); text-decoration: underline; }
+input[type="text"], input[type="search"], select { font-family: var(--mono); font-size: 13px;
+  padding: 5px 8px; border: 1px solid var(--rule-strong); border-radius: 2px; background: #fff;
+  color: var(--ink); width: 100%; max-width: 320px; }
+.btn { font-family: var(--sans); font-size: 14px; font-weight: 550; padding: 8px 16px;
+  border-radius: 2px; border: 1px solid transparent; background: var(--action); color: #fff;
+  cursor: pointer; text-decoration: none; display: inline-block; }
+.btn:hover { background: var(--action-hover); }
+.btn.quiet { background: #fff; color: var(--ink); border-color: var(--rule-strong); }
+.btn.quiet:hover { background: #f4f6fa; }
+.btn.link { background: none; border: none; color: var(--action); padding: 0; font-size: 13px; }
+.btn.link:hover { background: none; text-decoration: underline; }
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--rule-strong); }
+.tab { padding: 8px 14px; font-size: 14px; color: var(--muted); text-decoration: none;
+  border: 1px solid transparent; border-bottom: none; border-radius: 3px 3px 0 0; margin-bottom: -1px; }
+.tab:hover { color: var(--ink); background: #edf0f5; }
+.tab.active { background: var(--panel); color: var(--ink); font-weight: 560;
+  border-color: var(--rule-strong); border-bottom: 1px solid var(--panel); }
+.pill { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
+  background: var(--changed-bg); color: var(--changed-ink); border: 1px solid var(--changed-edge);
+  border-radius: 9px; font-size: 11px; font-weight: 600; text-align: center; }
+.crumbs { font-size: 13px; color: var(--muted); margin-bottom: 14px; word-break: break-word; }
+.crumbs a { text-decoration: none; }
+.crumbs span { padding: 0 6px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+.toolbar .search { display: flex; gap: 8px; flex: 1 1 300px; }
+.flash { padding: 10px 14px; border-radius: 3px; margin-bottom: 16px; font-size: 14px; }
+.flash.alert { background: var(--danger-bg); border: 1px solid #e3b5b0; color: var(--danger); }
+.actionbar { position: sticky; bottom: 0; margin: 0 -20px -120px; padding: 14px 20px;
+  background: rgba(255,255,255,0.96); border-top: 1px solid var(--rule-strong);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.actionbar .count { font-size: 13.5px; color: var(--muted); flex: 1 1 auto; }
+.actionbar .count b { color: var(--changed-ink); }
+.lede { max-width: 62ch; }
+.lede p { color: var(--muted); }
+.steps { max-width: 62ch; color: var(--muted); font-size: 14px; padding-left: 18px; }
+.steps li { margin-bottom: 6px; }
+.dropzone { border: 1px dashed var(--rule-strong); border-radius: 3px; padding: 20px; background: #fbfcfd; }
+.dropzone.over { border-color: var(--action); background: #f3f0fb; }
+.dropzone p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+@media (max-width: 640px) {
+  th:nth-child(2), td:nth-child(2), th:last-child, td:last-child { display: none; }
+  .shell { padding: 16px 14px 130px; }
+  .actionbar { margin: 0 -14px -130px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="masthead">
+    <h1>Save editor</h1>
+    <p>Edit values inside RPG Maker XP <code>.rxdata</code> saves - entirely in your browser</p>
+  </div>
+  <div id="app"></div>
+</div>
+<script>
+/* Marshal 4.8 reading and surgical editing, in the browser.
+ *
+ * A direct port of the Ruby implementation, and held to the same rule: values
+ * are located down to their byte range and edits are spliced over that range,
+ * so everything the app has never seen is copied through untouched. */
+(function (global) {
+  "use strict";
+
+  var FIXNUM_MIN = -(Math.pow(2, 30));
+  var FIXNUM_MAX = Math.pow(2, 30) - 1;
+  var ROOT_ID = -1;
+
+  function EditError(message) {
+    this.name = "EditError";
+    this.message = message;
+  }
+  EditError.prototype = Object.create(Error.prototype);
+
+  function ParseError(message) {
+    this.name = "ParseError";
+    this.message = message;
+  }
+  ParseError.prototype = Object.create(Error.prototype);
+
+  /* Symbols and raw string bytes are held as latin1 so every byte survives a
+   * round trip; display decodes as UTF-8 separately. */
+  function latin1(bytes) {
+    var out = "";
+    for (var i = 0; i < bytes.length; i += 1) out += String.fromCharCode(bytes[i]);
+    return out;
+  }
+
+  function fromLatin1(text) {
+    var out = new Uint8Array(text.length);
+    for (var i = 0; i < text.length; i += 1) out[i] = text.charCodeAt(i) & 0xff;
+    return out;
+  }
+
+  function utf8(text) {
+    if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(text);
+    return fromLatin1(unescape(encodeURIComponent(text)));
+  }
+
+  function readUtf8(bytes) {
+    if (typeof TextDecoder !== "undefined") {
+      return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    }
+    try {
+      return decodeURIComponent(escape(latin1(bytes)));
+    } catch (e) {
+      return latin1(bytes);
+    }
+  }
+
+  function concat(parts) {
+    var total = 0;
+    var i;
+    for (i = 0; i < parts.length; i += 1) total += parts[i].length;
+    var out = new Uint8Array(total);
+    var at = 0;
+    for (i = 0; i < parts.length; i += 1) {
+      out.set(parts[i], at);
+      at += parts[i].length;
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- encoding
+
+  function packLong(number) {
+    if (number === 0) return new Uint8Array([0]);
+    if (number > 0 && number < 123) return new Uint8Array([number + 5]);
+    if (number < 0 && number > -124) return new Uint8Array([(number - 5) & 0xff]);
+
+    var buffer = [];
+    var value = number;
+    for (var i = 1; i < 5; i += 1) {
+      buffer.push(value & 0xff);
+      value >>= 8;
+      if (value === 0) return new Uint8Array([i].concat(buffer));
+      if (value === -1) return new Uint8Array([(-i) & 0xff].concat(buffer));
+    }
+    throw new EditError("Number is too large for this save format.");
+  }
+
+  function encodeInteger(value) {
+    if (!(value >= FIXNUM_MIN && value <= FIXNUM_MAX)) {
+      throw new EditError("Enter a whole number between " + FIXNUM_MIN + " and " + FIXNUM_MAX + ".");
+    }
+    return concat([new Uint8Array([0x69]), packLong(value)]);
+  }
+
+  function encodeNil() {
+    return new Uint8Array([0x30]);
+  }
+
+  function encodeBoolean(value) {
+    return new Uint8Array([value ? 0x54 : 0x46]);
+  }
+
+  function encodeString(text) {
+    var bytes = utf8(text);
+    return concat([new Uint8Array([0x22]), packLong(bytes.length), bytes]);
+  }
+
+  function symbolName(value) {
+    var name = String(value == null ? "" : value).trim().replace(/^:/, "");
+    if (!name) throw new EditError("A name can't be empty.");
+    if (/\s/.test(name)) throw new EditError("A name can't contain spaces.");
+    if (/[^\x20-\x7e]/.test(name)) {
+      throw new EditError("Names have to be plain ASCII, like POTION or SUPER_POTION.");
+    }
+    return name;
+  }
+
+  function encodeSymbol(name) {
+    var bytes = fromLatin1(symbolName(name));
+    return concat([new Uint8Array([0x3a]), packLong(bytes.length), bytes]);
+  }
+
+  function encodeSymbolLink(index) {
+    return concat([new Uint8Array([0x3b]), packLong(index)]);
+  }
+
+  /* Floats carry no symbols and take one object slot either way, so the
+   * shortest round-trip form is safe to write. */
+  function encodeFloat(value) {
+    var text = String(value);
+    if (value === Infinity) text = "inf";
+    else if (value === -Infinity) text = "-inf";
+    else if (Number.isNaN(value)) text = "nan";
+    var bytes = fromLatin1(text);
+    return concat([new Uint8Array([0x66]), packLong(bytes.length), bytes]);
+  }
+
+  // ----------------------------------------------------------------- reading
+
+  function Node(kind, start) {
+    this.kind = kind;
+    this.start = start;
+    this.children = [];
+  }
+  Node.prototype.byteLength = function () {
+    return this.finish - this.start;
+  };
+
+  function Scanner(data) {
+    this.data = data;
+    this.pos = 0;
+    this.index = new Map();
+    this.dumps = [];
+    this.objects = [];
+    this.symbols = [];
+    this.symbolRefs = [];
+    this.currentRefs = [];
+    this.trailing = 0;
+  }
+
+  Scanner.prototype.parse = function () {
+    while (this.pos < this.data.length &&
+           this.data[this.pos] === 4 && this.data[this.pos + 1] === 8) {
+      this.symbols = [];
+      this.objects = [];
+      this.currentRefs = [];
+      this.symbolRefs.push(this.currentRefs);
+      this.pos += 2;
+      this.dumps.push(this.readValue("value"));
+    }
+    if (!this.dumps.length) {
+      throw new ParseError("This isn't a Ruby Marshal stream (expected bytes 04 08).");
+    }
+    this.trailing = this.data.length - this.pos;
+    return this;
+  };
+
+  Scanner.prototype.readBytes = function (count) {
+    if (this.pos + count > this.data.length) {
+      throw new ParseError("Ran out of data at byte " + this.pos + ".");
+    }
+    var out = this.data.subarray(this.pos, this.pos + count);
+    this.pos += count;
+    return out;
+  };
+
+  Scanner.prototype.readLong = function () {
+    if (this.pos >= this.data.length) {
+      throw new ParseError("Ran out of data at byte " + this.pos + ".");
+    }
+    var c = this.data[this.pos];
+    this.pos += 1;
+    if (c > 127) c -= 256;
+    if (c === 0) return 0;
+    var n, i;
+    if (c > 0) {
+      if (c > 4) return c - 5;
+      n = 0;
+      for (i = 0; i < c; i += 1) n |= this.data[this.pos + i] << (8 * i);
+      this.pos += c;
+      return n;
+    }
+    if (c < -4) return c + 5;
+    n = -1;
+    for (i = 0; i < -c; i += 1) {
+      n &= ~(0xff << (8 * i));
+      n |= this.data[this.pos + i] << (8 * i);
+    }
+    this.pos += -c;
+    return n;
+  };
+
+  Scanner.prototype.register = function (node) {
+    node.objIndex = this.objects.length;
+    this.objects.push(node);
+  };
+
+  Scanner.prototype.readIvars = function (node) {
+    var count = this.readLong();
+    for (var i = 0; i < count; i += 1) {
+      var name = this.readValue("ivar_name");
+      node.children.push([String(name.value), this.readValue("value")]);
+    }
+  };
+
+  Scanner.prototype.readClassName = function () {
+    return String(this.readValue("class_name").value);
+  };
+
+  Scanner.prototype.readValue = function (role) {
+    var start = this.pos;
+    if (this.pos >= this.data.length) {
+      throw new ParseError("Ran out of data at byte " + this.pos + ".");
+    }
+    var tag = this.data[this.pos];
+    this.pos += 1;
+    var node = new Node("unknown", start);
+    var count, i, key, value, raw;
+
+    switch (tag) {
+      case 0x30: node.kind = "nil"; break;
+      case 0x54: node.kind = "true"; node.value = true; break;
+      case 0x46: node.kind = "false"; node.value = false; break;
+      case 0x69: node.kind = "int"; node.value = this.readLong(); break;
+      case 0x3a:
+        node.kind = "symbol";
+        node.role = role;
+        node.value = latin1(this.readBytes(this.readLong()));
+        this.symbols.push(node.value);
+        this.currentRefs.push(node);
+        break;
+      case 0x3b:
+        node.kind = "symlink";
+        node.role = role;
+        node.ref = this.readLong();
+        node.value = this.symbols[node.ref];
+        this.currentRefs.push(node);
+        break;
+      case 0x40: node.kind = "link"; node.ref = this.readLong(); break;
+      case 0x49:
+        node.kind = "ivar";
+        node.children.push(["value", this.readValue("value")]);
+        this.readIvars(node);
+        break;
+      case 0x22:
+        node.kind = "string";
+        raw = this.readBytes(this.readLong());
+        node.raw = raw.slice();
+        node.value = readUtf8(raw);
+        this.register(node);
+        break;
+      case 0x5b:
+        node.kind = "array";
+        this.register(node);
+        count = this.readLong();
+        for (i = 0; i < count; i += 1) node.children.push([String(i), this.readValue("value")]);
+        break;
+      case 0x7b:
+      case 0x7d:
+        node.kind = "hash";
+        this.register(node);
+        node.keyNodes = [];
+        count = this.readLong();
+        for (i = 0; i < count; i += 1) {
+          key = this.readValue("value");
+          value = this.readValue("value");
+          node.keyNodes.push(key);
+          node.children.push([keyLabel(key), value]);
+        }
+        if (tag === 0x7d) node.children.push(["default", this.readValue("value")]);
+        break;
+      case 0x6f:
+        node.kind = "object";
+        node.className = this.readClassName();
+        this.register(node);
+        this.readIvars(node);
+        break;
+      case 0x75:
+        node.kind = "userdef";
+        node.className = this.readClassName();
+        node.raw = this.readBytes(this.readLong()).slice();
+        node.value = node.raw.length;
+        this.register(node);
+        break;
+      case 0x55:
+        node.kind = "usermarshal";
+        node.className = this.readClassName();
+        this.register(node);
+        node.children.push(["data", this.readValue("value")]);
+        break;
+      case 0x66:
+        node.kind = "float";
+        raw = latin1(this.readBytes(this.readLong()));
+        node.value = raw === "inf" ? Infinity : raw === "-inf" ? -Infinity :
+                     raw === "nan" ? NaN : parseFloat(raw.split("\u0000")[0]);
+        this.register(node);
+        break;
+      case 0x6c:
+        node.kind = "bignum";
+        var sign = latin1(this.readBytes(1));
+        var words = this.readLong();
+        var digits = this.readBytes(words * 2);
+        var total = 0;
+        for (i = digits.length - 1; i >= 0; i -= 1) total = total * 256 + digits[i];
+        node.value = sign === "-" ? -total : total;
+        this.register(node);
+        break;
+      case 0x63:
+      case 0x6d:
+      case 0x4d:
+        node.kind = tag === 0x63 ? "class" : "module";
+        node.value = latin1(this.readBytes(this.readLong()));
+        this.register(node);
+        break;
+      case 0x65:
+        node.kind = "extended";
+        node.className = this.readClassName();
+        node.children.push(["value", this.readValue("value")]);
+        break;
+      case 0x43:
+        node.kind = "uclass";
+        node.className = this.readClassName();
+        node.children.push(["value", this.readValue("value")]);
+        break;
+      case 0x53:
+        node.kind = "struct";
+        node.className = this.readClassName();
+        this.register(node);
+        this.readIvars(node);
+        break;
+      case 0x2f:
+        node.kind = "regexp";
+        node.value = latin1(this.readBytes(this.readLong()));
+        this.pos += 1;
+        this.register(node);
+        break;
+      case 0x64:
+        node.kind = "data";
+        node.className = this.readClassName();
+        this.register(node);
+        node.children.push(["value", this.readValue("value")]);
+        break;
+      default:
+        throw new ParseError("Unknown type byte 0x" + tag.toString(16) + " at offset " + start + ".");
+    }
+
+    node.finish = this.pos;
+    this.index.set(start, node);
+    return node;
+  };
+
+  function keyLabel(key) {
+    switch (key.kind) {
+      case "symbol": case "symlink": return ":" + key.value;
+      case "string": return key.value;
+      case "int": case "float": return String(key.value);
+      case "nil": return "nil";
+      case "true": case "false": return String(key.value);
+      default: return "<" + key.kind + ">";
+    }
+  }
+
+  // --------------------------------------------------------------- presenter
+
+  var ENCODING_IVARS = ["E", "encoding"];
+
+  function effective(node) {
+    if (node.kind !== "ivar") return node;
+    if (!node.children.length) return node;
+    var inner = node.children[0][1];
+    var extras = node.children.slice(1);
+    var onlyEncoding = extras.every(function (pair) {
+      return ENCODING_IVARS.indexOf(pair[0]) !== -1;
+    });
+    if (inner.kind === "string" && onlyEncoding) return inner;
+    return node;
+  }
+
+  function editorFor(node) {
+    switch (node.kind) {
+      case "int": return { type: "integer" };
+      case "nil": return { type: "integer", blankIsNil: true };
+      case "float": return { type: "float" };
+      case "true": case "false": return { type: "boolean" };
+      case "string": return { type: "string" };
+      case "symbol": case "symlink":
+        return node.role === "value" ? { type: "symbol" } : null;
+      default: return null;
+    }
+  }
+
+  function editable(node) {
+    return editorFor(effective(node)) !== null;
+  }
+
+  function typeLabel(node) {
+    node = effective(node);
+    switch (node.kind) {
+      case "int": return "Number";
+      case "float": return "Decimal";
+      case "string": return "Text";
+      case "symbol": case "symlink": return "Name";
+      case "true": case "false": return "Yes/no";
+      case "nil": return "Empty";
+      case "array": return "List of " + node.children.length;
+      case "hash": return "Table of " + node.children.length;
+      case "object": return node.className;
+      case "ivar": return (node.children[0] && node.children[0][1].className) || "Value";
+      case "userdef": return node.className + " (raw)";
+      case "usermarshal": return node.className;
+      case "struct": return node.className + " (struct)";
+      case "link": return "Same as earlier value";
+      case "bignum": return "Large number";
+      case "root": return "File";
+      default: return node.kind;
+    }
+  }
+
+  function inputValue(node) {
+    node = effective(node);
+    switch (node.kind) {
+      case "string": return node.value;
+      case "symbol": case "symlink": return String(node.value);
+      case "nil": return "";
+      case "true": return "true";
+      case "false": return "false";
+      default: return String(node.value);
+    }
+  }
+
+  function summary(node, tree) {
+    node = effective(node);
+    switch (node.kind) {
+      case "int": case "float": case "bignum": return String(node.value);
+      case "string": return JSON.stringify(node.value);
+      case "symbol": case "symlink": return ":" + node.value;
+      case "true": return "true";
+      case "false": return "false";
+      case "nil": return "empty";
+      case "array": return briefList(node, tree);
+      case "hash": return node.children.length + (node.children.length === 1 ? " entry" : " entries");
+      case "object": case "struct": case "usermarshal": return node.children.length + " fields";
+      case "userdef": return node.raw.length + " bytes of " + node.className + " data";
+      case "link":
+        var target = tree && tree.scanner.objects[node.ref];
+        return target ? "same as " + typeLabel(target).toLowerCase() + " at byte " + target.start
+                      : "points to an earlier value";
+      default: return "";
+    }
+  }
+
+  function briefList(node, tree) {
+    var parts = [];
+    for (var i = 0; i < node.children.length; i += 1) {
+      var piece = summary(node.children[i][1], tree);
+      if (parts.join(", ").length + piece.length > 60) break;
+      parts.push(piece);
+    }
+    return "[" + parts.join(", ") + (parts.length < node.children.length ? ", …" : "") + "]";
+  }
+
+  function labelFor(name, node) {
+    var base = String(name).replace(/^@/, "").replace(/^:/, "").replace(/_/g, " ");
+    return base || typeLabel(node);
+  }
+
+  // -------------------------------------------------------------- navigation
+
+  function Tree(data) {
+    this.data = data;
+    this.scanner = new Scanner(data).parse();
+    this.root = this.buildRoot();
+    this.parents = new Map();
+    this.labels = new Map();
+    this.labels.set(this.root.start, "File");
+    this.indexParents(this.root);
+  }
+
+  Tree.prototype.buildRoot = function () {
+    if (this.scanner.dumps.length === 1) return this.scanner.dumps[0];
+    var root = new Node("root", ROOT_ID);
+    root.finish = this.data.length;
+    for (var i = 0; i < this.scanner.dumps.length; i += 1) {
+      root.children.push(["Section " + (i + 1), this.scanner.dumps[i]]);
+    }
+    return root;
+  };
+
+  Tree.prototype.indexParents = function (node) {
+    var children = effective(node).children;
+    for (var i = 0; i < children.length; i += 1) {
+      var child = children[i][1];
+      this.parents.set(child.start, node);
+      this.labels.set(child.start, labelFor(children[i][0], child));
+      this.indexParents(child);
+    }
+  };
+
+  Tree.prototype.node = function (offset) {
+    offset = Number(offset);
+    if (offset === this.root.start) return this.root;
+    return this.scanner.index.get(offset) || null;
+  };
+
+  Tree.prototype.label = function (node) {
+    return this.labels.get(node.start) || typeLabel(node);
+  };
+
+  Tree.prototype.children = function (node) {
+    return effective(node).children;
+  };
+
+  Tree.prototype.breadcrumbs = function (node) {
+    var trail = [];
+    var current = node;
+    while (current) {
+      trail.unshift(current);
+      var parent = this.parents.get(current.start);
+      if (!parent || parent.start === current.start) break;
+      current = parent;
+    }
+    return trail;
+  };
+
+  Tree.prototype.pathParts = function (node) {
+    var self = this;
+    return this.breadcrumbs(node).slice(0, -1).map(function (ancestor) {
+      return { label: self.label(ancestor), offset: ancestor.start };
+    });
+  };
+
+  Tree.prototype.walk = function (node, visit) {
+    var stack = [node];
+    while (stack.length) {
+      var current = stack.pop();
+      if (visit(current) === false) return;
+      for (var i = current.children.length - 1; i >= 0; i -= 1) stack.push(current.children[i][1]);
+    }
+  };
+
+  Tree.prototype.nodeContaining = function (offset) {
+    var best = null;
+    this.walk(this.root, function (node) {
+      if (node.start === ROOT_ID) return;
+      if (offset < node.start || offset >= node.finish) return;
+      if (!best || node.byteLength() <= best.byteLength()) best = node;
+    });
+    return best;
+  };
+
+  Tree.prototype.parseQuery = function (raw) {
+    var text = String(raw || "").trim();
+    if (!text) return { kind: "empty" };
+    var m = text.match(/^(?:byte|offset|@)\s*[:#]?\s*(\d+)$/i);
+    if (m) return { kind: "offset", offset: parseInt(m[1], 10) };
+    m = text.match(/^0x([0-9a-f]+)$/i);
+    if (m) return { kind: "offset", offset: parseInt(m[1], 16) };
+    if (/^(?:[0-9a-f]{2}[\s,]+)+[0-9a-f]{2}$/i.test(text)) {
+      var pairs = text.match(/[0-9a-f]{2}/gi).map(function (p) { return parseInt(p, 16); });
+      return { kind: "bytes", pattern: new Uint8Array(pairs) };
+    }
+    return { kind: "text", text: text.toLowerCase() };
+  };
+
+  Tree.prototype.valueText = function (node) {
+    var target = effective(node);
+    switch (target.kind) {
+      case "string": return target.value;
+      case "symbol": case "symlink": return String(target.value);
+      case "int": case "float": case "bignum": return String(target.value);
+      case "object": case "userdef": case "usermarshal": case "struct":
+        return String(target.className || "");
+      default: return "";
+    }
+  };
+
+  Tree.prototype.search = function (raw, scope, limit) {
+    var query = this.parseQuery(raw);
+    scope = scope || this.root;
+    limit = limit || 200;
+    var self = this;
+    var results = [];
+
+    function within(node) {
+      if (scope === self.root) return true;
+      return node.start >= scope.start && node.finish <= scope.finish;
+    }
+
+    if (query.kind === "empty") return results;
+
+    if (query.kind === "offset") {
+      var hit = this.nodeContaining(query.offset);
+      return hit && within(hit) ? [hit] : [];
+    }
+
+    if (query.kind === "bytes") {
+      var from = scope === this.root ? 0 : scope.start;
+      var ceiling = scope === this.root ? this.data.length : scope.finish;
+      while (from < ceiling) {
+        var found = indexOfBytes(this.data, query.pattern, from);
+        if (found < 0 || found >= ceiling) break;
+        var node = this.nodeContaining(found);
+        if (node && results.indexOf(node) === -1) results.push(node);
+        if (results.length >= limit) break;
+        from = found + 1;
+      }
+      return results;
+    }
+
+    this.walk(scope, function (node) {
+      if (node === scope) return;
+      var label = (self.labels.get(node.start) || "").toLowerCase();
+      if (label.indexOf(query.text) !== -1 ||
+          self.valueText(node).toLowerCase().indexOf(query.text) !== -1) {
+        results.push(node);
+      }
+      if (results.length >= limit) return false;
+    });
+    return results;
+  };
+
+  Tree.prototype.stats = function () {
+    var count = 0;
+    this.walk(this.root, function () { count += 1; });
+    return {
+      bytes: this.data.length,
+      dumps: this.scanner.dumps.length,
+      values: count - (this.scanner.dumps.length > 1 ? 1 : 0),
+      trailing: this.scanner.trailing
+    };
+  };
+
+  function indexOfBytes(haystack, needle, from) {
+    outer:
+    for (var i = from; i <= haystack.length - needle.length; i += 1) {
+      for (var j = 0; j < needle.length; j += 1) {
+        if (haystack[i + j] !== needle[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
+  }
+
+  // ----------------------------------------------------------------- editing
+
+  var SYMBOL_KINDS = ["symbol", "symlink"];
+
+  function isSymbol(node) {
+    return SYMBOL_KINDS.indexOf(node.kind) !== -1;
+  }
+
+  function encodeEdit(node, input) {
+    var editor = editorFor(node);
+    if (!editor) throw new EditError("That value can't be edited.");
+    input = input == null ? "" : String(input);
+    var trimmed = input.trim();
+
+    switch (editor.type) {
+      case "integer":
+        if (!trimmed && node.kind === "nil") return encodeNil();
+        if (trimmed.toLowerCase() === "nil") return encodeNil();
+        if (!/^-?\d+$/.test(trimmed)) {
+          throw new EditError("Enter a whole number, not \"" + trimmed + "\".");
+        }
+        return encodeInteger(parseInt(trimmed, 10));
+      case "float":
+        if (!/^-?\d*\.?\d+(e-?\d+)?$/i.test(trimmed)) {
+          throw new EditError("Enter a number, not \"" + trimmed + "\".");
+        }
+        return encodeFloat(parseFloat(trimmed));
+      case "boolean":
+        return encodeBoolean(["true", "1", "on", "yes"].indexOf(trimmed.toLowerCase()) !== -1);
+      case "string":
+        return encodeString(input);
+      case "symbol":
+        return encodeSymbol(trimmed);
+      default:
+        throw new EditError("That value can't be edited.");
+    }
+  }
+
+  /* Marshal writes a symbol out in full the first time and refers back to it by
+   * position afterwards, so a symbol can't be rewritten where it sits: the
+   * mention you want to change is often just a back-reference, and adding or
+   * removing a definition renumbers every reference after it.
+   *
+   * So rather than patch one mention, rebuild them all. Walking the mentions in
+   * order and re-deciding each one -- write it out, or point back at an earlier
+   * one -- keeps the numbering right by construction. With nothing edited this
+   * reproduces the original bytes exactly. */
+  function symbolReplacements(scanner, symbolEdits) {
+    var out = [];
+    for (var d = 0; d < scanner.symbolRefs.length; d += 1) {
+      var mentions = scanner.symbolRefs[d];
+      var table = new Map();
+      for (var i = 0; i < mentions.length; i += 1) {
+        var node = mentions[i];
+        var name = symbolEdits.has(node.start) ? symbolEdits.get(node.start) : node.value;
+        var bytes;
+        if (table.has(name)) {
+          bytes = encodeSymbolLink(table.get(name));
+        } else {
+          table.set(name, table.size);
+          bytes = encodeSymbol(name);
+        }
+        out.push({ start: node.start, finish: node.finish, bytes: bytes });
+      }
+    }
+    return out;
+  }
+
+  function changed(node, input, data) {
+    if (isSymbol(node)) return symbolName(input) !== node.value;
+    var fresh = encodeEdit(node, input);
+    var original = data.subarray(node.start, node.finish);
+    if (fresh.length !== original.length) return true;
+    for (var i = 0; i < fresh.length; i += 1) if (fresh[i] !== original[i]) return true;
+    return false;
+  }
+
+  /* edits: Map of byte offset -> raw input string */
+  function applyEdits(data, tree, edits) {
+    var replacements = [];
+    var symbolEdits = new Map();
+
+    edits.forEach(function (input, offset) {
+      var node = tree.node(offset);
+      if (!node) throw new EditError("No value lives at byte " + offset + ".");
+      var target = effective(node);
+      if (isSymbol(target)) {
+        symbolEdits.set(target.start, symbolName(input));
+      } else {
+        replacements.push({ start: target.start, finish: target.finish, bytes: encodeEdit(target, input) });
+      }
+    });
+
+    if (symbolEdits.size) {
+      replacements = replacements.concat(symbolReplacements(tree.scanner, symbolEdits));
+    }
+
+    replacements.sort(function (a, b) { return a.start - b.start; });
+
+    var parts = [];
+    var cursor = 0;
+    for (var i = 0; i < replacements.length; i += 1) {
+      var r = replacements[i];
+      if (r.start < cursor) continue;
+      parts.push(data.subarray(cursor, r.start));
+      parts.push(r.bytes);
+      cursor = r.finish;
+    }
+    parts.push(data.subarray(cursor));
+    return concat(parts);
+  }
+
+  // -------------------------------------------------------------- highlights
+
+  function ivarOf(node, name) {
+    for (var i = 0; i < node.children.length; i += 1) {
+      if (node.children[i][0] === name) return node.children[i][1];
+    }
+    return null;
+  }
+
+  function findObject(tree, test) {
+    var found = null;
+    tree.walk(tree.root, function (node) {
+      if (found) return false;
+      if ((node.kind === "object" || node.kind === "struct") && test(node)) {
+        found = node;
+        return false;
+      }
+    });
+    return found;
+  }
+
+  function dataArray(tree, className) {
+    var owner = findObject(tree, function (node) { return node.className === className; });
+    if (!owner) return null;
+    var array = ivarOf(owner, "@data");
+    return array && array.kind === "array" ? array : null;
+  }
+
+  /* The parts people actually came to change, found by the shape of what they
+   * hold rather than by save format version. */
+  function highlights(tree) {
+    var sections = [];
+    var trainer = findObject(tree, function (node) {
+      return ivarOf(node, "@money") && ivarOf(node, "@name");
+    });
+
+    if (trainer) {
+      var fields = [];
+      [["@name", "Name"], ["@money", "Money"], ["@coins", "Coins"],
+       ["@soot", "Soot"], ["@id", "Trainer ID"]].forEach(function (pair) {
+        var child = ivarOf(trainer, pair[0]);
+        if (child && editable(child)) fields.push({ label: pair[1], node: child });
+      });
+      if (fields.length) sections.push({ id: "trainer", title: "Trainer", kind: "fields", fields: fields });
+      sections.push({
+        id: "player",
+        title: trainer.className || "Player",
+        kind: "node",
+        node: trainer
+      });
+      var badges = ivarOf(trainer, "@badges");
+      if (badges && badges.kind === "array") {
+        sections.push({ id: "badges", title: "Badges", kind: "indexed", node: badges, prefix: "Badge" });
+      }
+    }
+
+    var bag = trainer ? ivarOf(trainer, "@bag") : null;
+    if (!bag || bag.kind !== "object") {
+      bag = findObject(tree, function (node) { return ivarOf(node, "@pockets"); });
+    }
+    if (bag) sections.push({ id: "bag", title: "Bag", kind: "node", node: bag });
+
+    var variables = dataArray(tree, "Game_Variables");
+    if (variables) {
+      sections.push({ id: "variables", title: "Variables", kind: "indexed", node: variables, prefix: "Variable" });
+    }
+    var switches = dataArray(tree, "Game_Switches");
+    if (switches) {
+      sections.push({ id: "switches", title: "Switches", kind: "indexed", node: switches, prefix: "Switch" });
+    }
+    return sections;
+  }
+
+  global.RX = {
+    ROOT_ID: ROOT_ID,
+    EditError: EditError,
+    ParseError: ParseError,
+    Scanner: Scanner,
+    Tree: Tree,
+    packLong: packLong,
+    encodeInteger: encodeInteger,
+    encodeString: encodeString,
+    encodeSymbol: encodeSymbol,
+    encodeFloat: encodeFloat,
+    symbolName: symbolName,
+    symbolReplacements: symbolReplacements,
+    applyEdits: applyEdits,
+    encodeEdit: encodeEdit,
+    changed: changed,
+    effective: effective,
+    editable: editable,
+    editorFor: editorFor,
+    typeLabel: typeLabel,
+    inputValue: inputValue,
+    summary: summary,
+    labelFor: labelFor,
+    highlights: highlights,
+    isSymbol: isSymbol,
+    utf8: utf8
+  };
+})(typeof globalThis !== "undefined" ? globalThis : this);
+</script>
+<script>
+/* The interface. Everything happens in the page: the save is read with
+ * FileReader, edited in memory, and handed back as a download. Nothing is
+ * uploaded anywhere, so there is no session to expire and no server to trust. */
+(function () {
+  "use strict";
+
+  var INDEXED_LIMIT = 300;
+  var state = {
+    name: null,
+    data: null,
+    tree: null,
+    edits: new Map(), // offset -> { value, enabled }
+    tab: null,
+    at: null,
+    query: null,
+    scope: null
+  };
+
+  var app = document.getElementById("app");
+
+  // ------------------------------------------------------------- small tools
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) {
+      if (key === "class") node.className = attrs[key];
+      else if (key === "text") node.textContent = attrs[key];
+      else if (key.slice(0, 2) === "on") node.addEventListener(key.slice(2), attrs[key]);
+      else if (attrs[key] !== null && attrs[key] !== undefined) node.setAttribute(key, attrs[key]);
+    });
+    (children || []).forEach(function (child) {
+      if (child === null || child === undefined) return;
+      node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+    });
+    return node;
+  }
+
+  function truncate(text, limit) {
+    text = String(text === null || text === undefined ? "" : text);
+    return text.length > limit ? text.slice(0, limit) + "…" : text;
+  }
+
+  function plural(count, word) {
+    return count + " " + word + (count === 1 ? "" : "s");
+  }
+
+  function enabledEdits() {
+    var out = new Map();
+    state.edits.forEach(function (entry, offset) {
+      if (entry.enabled) out.set(offset, entry.value);
+    });
+    return out;
+  }
+
+  function download(bytes, filename) {
+    var url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    var link = el("a", { href: url, download: filename });
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function go(view) {
+    Object.keys(view).forEach(function (key) { state[key] = view[key]; });
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  // ---------------------------------------------------------------- the file
+
+  function openFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      try {
+        var tree = new RX.Tree(bytes);
+        state.name = file.name;
+        state.data = bytes;
+        state.tree = tree;
+        state.edits = new Map();
+        state.tab = null;
+        state.at = null;
+        state.query = null;
+        state.scope = null;
+        render();
+      } catch (e) {
+        renderUpload(e.message || "That file could not be read.");
+      }
+    };
+    reader.onerror = function () { renderUpload("That file could not be read."); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ----------------------------------------------------------------- editing
+
+  function rowFor(label, node) {
+    var target = RX.effective(node);
+    var entry = state.edits.get(target.start);
+    var isEditable = RX.editable(target);
+    return {
+      node: node,
+      target: target,
+      label: label,
+      type: RX.typeLabel(node),
+      summary: RX.summary(node, state.tree),
+      editable: isEditable,
+      container: !isEditable && RX.effective(node).children.length > 0,
+      value: entry ? entry.value : RX.inputValue(target),
+      original: RX.inputValue(target),
+      pending: !!entry,
+      offset: target.start
+    };
+  }
+
+  function commitEdit(row, input, errorSlot) {
+    var value = input.value;
+    try {
+      RX.encodeEdit(row.target, value); // rejects anything unwritable
+      if (RX.changed(row.target, value, state.data)) {
+        var existing = state.edits.get(row.offset);
+        state.edits.set(row.offset, {
+          value: value,
+          enabled: existing ? existing.enabled : true
+        });
+      } else {
+        state.edits.delete(row.offset);
+      }
+      errorSlot.textContent = "";
+      errorSlot.className = "field-error";
+      paintRow(row, input, errorSlot);
+      paintCounts();
+    } catch (e) {
+      errorSlot.textContent = e.message;
+      errorSlot.className = "field-error showing";
+    }
+  }
+
+  function paintRow(row, input, errorSlot) {
+    var entry = state.edits.get(row.offset);
+    var tr = input.closest("tr");
+    tr.className = entry ? "row changed" : "row";
+    var was = tr.querySelector(".was");
+    if (entry) {
+      if (!was) {
+        was = el("span", { class: "was" });
+        input.parentNode.insertBefore(was, errorSlot);
+      }
+      was.textContent = "was " + truncate(row.original, 40);
+    } else if (was) {
+      was.remove();
+    }
+  }
+
+  function paintCounts() {
+    var included = 0;
+    state.edits.forEach(function (entry) { if (entry.enabled) included += 1; });
+    var count = document.querySelector(".actionbar .count");
+    if (count) {
+      count.innerHTML = "";
+      if (state.edits.size) {
+        var held = state.edits.size - included;
+        count.appendChild(el("b", { text: plural(included, "change") }));
+        count.appendChild(document.createTextNode(
+          " will be applied" + (held ? ", " + held + " held back" : "") + "."
+        ));
+      } else {
+        count.textContent = "Changes save as you make them.";
+      }
+    }
+    var pill = document.querySelector(".tab-changes .pill");
+    var tab = document.querySelector(".tab-changes");
+    if (tab) {
+      if (state.edits.size && !pill) tab.appendChild(el("span", { class: "pill", text: String(state.edits.size) }));
+      else if (state.edits.size && pill) pill.textContent = String(state.edits.size);
+      else if (pill) pill.remove();
+    }
+    var discard = document.querySelector(".discard-all");
+    if (discard) discard.style.display = state.edits.size ? "" : "none";
+  }
+
+  // ----------------------------------------------------------------- drawing
+
+  function renderUpload(error) {
+    app.innerHTML = "";
+    var input = el("input", { type: "file", accept: ".rxdata,.rvdata,.rvdata2", id: "file" });
+    input.addEventListener("change", function () {
+      if (input.files && input.files[0]) openFile(input.files[0]);
+    });
+
+    var drop = el("div", { class: "dropzone" }, [
+      el("p", { text: "Drop a save file here, or choose one:" }),
+      input
+    ]);
+    drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+    drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+    drop.addEventListener("drop", function (e) {
+      e.preventDefault();
+      drop.classList.remove("over");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]);
+    });
+
+    app.appendChild(el("div", { class: "panel" }, [
+      el("h2", { text: "Open a save file" }),
+      el("div", { class: "panel-body lede" }, [
+        el("p", { text: "Browse everything inside an RPG Maker XP .rxdata save and change the " +
+                        "values you care about \u2014 money, variables, switches, names, bag items, " +
+                        "party data. Your file is read in this page and never leaves your computer." }),
+        error ? el("p", { class: "flash alert", text: error }) : null,
+        drop
+      ])
+    ]));
+
+    app.appendChild(el("div", { class: "panel" }, [
+      el("h2", { text: "How editing works" }),
+      el("div", { class: "panel-body" }, [
+        el("ol", { class: "steps" }, [
+          el("li", { text: "The file is read as a Ruby Marshal stream, the format RPG Maker XP and " +
+                           "Pokémon Essentials use, and every value is located down to its exact byte range." }),
+          el("li", { text: "Changing a value rewrites only that value's bytes. The rest is copied " +
+                           "through untouched, so a save from a game this page has never seen still " +
+                           "comes out intact." }),
+          el("li", { text: "Changes that would break the file's internal references are refused " +
+                           "rather than written." })
+        ])
+      ])
+    ]));
+  }
+
+  function sections() {
+    return RX.highlights(state.tree);
+  }
+
+  function tabsFor(list) {
+    var tabs = list.map(function (s) { return { id: s.id, title: s.title }; });
+    tabs.push({ id: "all", title: "All data" });
+    tabs.push({ id: "changes", title: "Changes" });
+    return tabs;
+  }
+
+  function renderTabs(list) {
+    var nav = el("nav", { class: "tabs", "aria-label": "Sections of this save" });
+    tabsFor(list).forEach(function (tab) {
+      var active = tab.id === state.tab;
+      var node = el("a", {
+        href: "#",
+        class: "tab" + (active ? " active" : "") + (tab.id === "changes" ? " tab-changes" : ""),
+        "aria-current": active ? "page" : null,
+        onclick: function (e) { e.preventDefault(); go({ tab: tab.id, at: null, query: null, scope: null }); }
+      }, [tab.title]);
+      if (tab.id === "changes" && state.edits.size) {
+        node.appendChild(el("span", { class: "pill", text: String(state.edits.size) }));
+      }
+      nav.appendChild(node);
+    });
+    return nav;
+  }
+
+  function pathSpan(node) {
+    var span = el("span", { class: "path" });
+    state.tree.pathParts(node).forEach(function (part, i) {
+      if (i) span.appendChild(document.createTextNode(" / "));
+      span.appendChild(el("a", {
+        href: "#",
+        text: part.label,
+        onclick: function (e) { e.preventDefault(); go({ tab: "all", at: part.offset, query: null }); }
+      }));
+    });
+    return span;
+  }
+
+  function renderRows(rows, showPath) {
+    var body = el("tbody");
+    rows.forEach(function (row) {
+      var name = el("td", { class: "name" });
+      if (row.container) {
+        name.appendChild(el("a", {
+          href: "#",
+          text: row.label,
+          onclick: function (e) { e.preventDefault(); go({ tab: "all", at: row.offset, query: null }); }
+        }));
+      } else {
+        name.appendChild(document.createTextNode(row.label));
+      }
+      if (showPath) name.appendChild(pathSpan(row.node));
+
+      var valueCell = el("td");
+      if (row.editable) {
+        var errorSlot = el("span", { class: "field-error" });
+        var input;
+        if (row.target.kind === "true" || row.target.kind === "false") {
+          input = el("select", {}, [
+            el("option", { value: "true", text: "true" }),
+            el("option", { value: "false", text: "false" })
+          ]);
+          input.value = row.value;
+        } else {
+          input = el("input", { type: "text", value: row.value, autocomplete: "off" });
+        }
+        input.addEventListener("change", function () { commitEdit(row, input, errorSlot); });
+        valueCell.appendChild(input);
+        if (row.pending) valueCell.appendChild(el("span", { class: "was", text: "was " + truncate(row.original, 40) }));
+        valueCell.appendChild(errorSlot);
+      } else {
+        valueCell.appendChild(el("span", { class: "value-mono", text: truncate(row.summary, 90) }));
+      }
+
+      var location = el("td", { class: "offset" });
+      if (row.offset >= 0) {
+        location.appendChild(el("span", { text: "byte " + row.offset }));
+        if (!row.container) {
+          location.appendChild(el("span", {
+            class: "offset-hex",
+            text: "0x" + row.offset.toString(16).toUpperCase()
+          }));
+        }
+      }
+
+      body.appendChild(el("tr", { class: row.pending ? "row changed" : "row" }, [
+        name, el("td", { class: "type", text: row.type }), valueCell, location
+      ]));
+    });
+
+    return el("table", {}, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { scope: "col", text: "Name" }),
+        el("th", { scope: "col", text: "Type" }),
+        el("th", { scope: "col", text: "Value" }),
+        el("th", { scope: "col", text: "Location" })
+      ])]),
+      body
+    ]);
+  }
+
+  function sectionRows(section) {
+    if (section.kind === "fields") {
+      return section.fields.map(function (field) { return rowFor(field.label, field.node); });
+    }
+    if (section.kind === "indexed") {
+      return section.node.children.slice(0, INDEXED_LIMIT).map(function (pair, i) {
+        return rowFor(section.prefix + " " + i, pair[1]);
+      });
+    }
+    return state.tree.children(section.node).slice(0, INDEXED_LIMIT).map(function (pair) {
+      return rowFor(RX.labelFor(pair[0], pair[1]), pair[1]);
+    });
+  }
+
+  function renderChanges() {
+    var panel = el("div", { class: "panel" }, [el("h2", { text: "Pending changes" })]);
+    if (!state.edits.size) {
+      panel.appendChild(el("div", { class: "panel-body" }, [
+        el("p", { class: "lede", text: "No changes yet. Edit a value on any tab and it will be listed here." })
+      ]));
+      return panel;
+    }
+
+    var body = el("tbody");
+    Array.from(state.edits.keys()).sort(function (a, b) { return a - b; }).forEach(function (offset) {
+      var entry = state.edits.get(offset);
+      var node = state.tree.node(offset);
+      if (!node) return;
+
+      var include = el("input", { type: "checkbox", "aria-label": "Include this change" });
+      include.checked = entry.enabled;
+      include.addEventListener("change", function () {
+        entry.enabled = include.checked;
+        render();
+      });
+
+      var name = el("td", { class: "name" }, [
+        el("a", {
+          href: "#",
+          text: state.tree.label(node),
+          onclick: function (e) { e.preventDefault(); go({ tab: "all", at: offset, query: null }); }
+        }),
+        pathSpan(node)
+      ]);
+
+      var change = el("td", { class: "value-mono" }, [
+        el("span", { class: "was-inline", text: truncate(RX.inputValue(node), 40) }),
+        el("span", { class: "arrow", text: " → " }),
+        el("b", { text: truncate(entry.value, 40) }),
+        el("span", { class: "offset", text: "byte " + offset })
+      ]);
+
+      var remove = el("button", {
+        class: "btn link",
+        text: "Remove",
+        onclick: function () { state.edits.delete(offset); render(); }
+      });
+
+      body.appendChild(el("tr", { class: entry.enabled ? "row" : "row muted" }, [
+        el("td", {}, [include]), name, change, el("td", {}, [remove])
+      ]));
+    });
+
+    panel.appendChild(el("table", {}, [
+      el("thead", {}, [el("tr", {}, [
+        el("th", { scope: "col", text: "Include" }),
+        el("th", { scope: "col", text: "Value" }),
+        el("th", { scope: "col", text: "Change" }),
+        el("th", { scope: "col", text: "" })
+      ])]),
+      body
+    ]));
+    return panel;
+  }
+
+  function renderSearch() {
+    var scopeNode = state.scope !== null ? state.tree.node(state.scope) : null;
+    var results = state.tree.search(state.query, scopeNode);
+    var wrap = document.createDocumentFragment();
+
+    var note = el("div", { class: "crumbs" });
+    if (scopeNode) {
+      note.appendChild(document.createTextNode("Searching inside "));
+      note.appendChild(el("b", { text: state.tree.label(scopeNode) }));
+      note.appendChild(document.createTextNode(" - "));
+      note.appendChild(el("a", {
+        href: "#",
+        text: "search the whole file instead",
+        onclick: function (e) { e.preventDefault(); go({ scope: null }); }
+      }));
+    } else {
+      note.appendChild(document.createTextNode(
+        "Searching the whole file. Try a name, a value, byte 15644, 0x3D1C, or a run of hex like 69 27 69."
+      ));
+    }
+    wrap.appendChild(note);
+
+    var panel = el("div", { class: "panel" }, [
+      el("h2", { text: plural(results.length, "match") + " for \u201c" + state.query + "\u201d" })
+    ]);
+    if (results.length) {
+      panel.appendChild(renderRows(results.map(function (node) {
+        return rowFor(state.tree.label(node), node);
+      }), true));
+      panel.appendChild(el("p", {
+        class: "panel-note",
+        text: "Matches are capped at 200. Narrow the search if what you want isn't here."
+      }));
+    } else {
+      panel.appendChild(el("div", { class: "panel-body" }, [
+        el("p", { class: "lede", text: "Nothing matched. Try part of a name, a value you can see in the game, or a byte offset." })
+      ]));
+    }
+    wrap.appendChild(panel);
+    return wrap;
+  }
+
+  function renderTree() {
+    var node = state.at === null ? state.tree.root : state.tree.node(state.at);
+    if (!node) node = state.tree.root;
+
+    var crumbs = el("div", { class: "crumbs" });
+    state.tree.breadcrumbs(node).forEach(function (crumb, i) {
+      if (i) crumbs.appendChild(el("span", { text: "/" }));
+      if (crumb === node) {
+        crumbs.appendChild(el("b", { text: state.tree.label(crumb) }));
+      } else {
+        crumbs.appendChild(el("a", {
+          href: "#",
+          text: state.tree.label(crumb),
+          onclick: function (e) { e.preventDefault(); go({ tab: "all", at: crumb.start }); }
+        }));
+      }
+    });
+    if (node !== state.tree.root) {
+      crumbs.appendChild(el("span", {
+        class: "offset",
+        text: "bytes " + node.start + "–" + (node.finish - 1)
+      }));
+    }
+
+    var rows = state.tree.children(node).map(function (pair) {
+      return rowFor(RX.labelFor(pair[0], pair[1]), pair[1]);
+    });
+
+    var panel = el("div", { class: "panel" }, [
+      el("h2", { text: state.tree.label(node) + " - " + RX.typeLabel(node) })
+    ]);
+    if (rows.length) {
+      panel.appendChild(renderRows(rows, false));
+    } else {
+      panel.appendChild(el("div", { class: "panel-body" }, [
+        el("p", { class: "lede", text: "This value has nothing inside it." })
+      ]));
+    }
+
+    var wrap = document.createDocumentFragment();
+    wrap.appendChild(crumbs);
+    wrap.appendChild(panel);
+    return wrap;
+  }
+
+  function renderActionbar() {
+    var bar = el("div", { class: "actionbar" }, [
+      el("span", { class: "count" }),
+      el("button", {
+        class: "btn",
+        text: "Download patched save",
+        onclick: function () {
+          try {
+            download(RX.applyEdits(state.data, state.tree, enabledEdits()), state.name);
+          } catch (e) {
+            alert(e.message);
+          }
+        }
+      }),
+      el("button", {
+        class: "btn link discard-all",
+        text: "Discard all",
+        onclick: function () { state.edits = new Map(); render(); }
+      })
+    ]);
+    return bar;
+  }
+
+  function renderToolbar() {
+    var scopeNode = (state.tab === "all" && state.at !== null) ? state.tree.node(state.at) : null;
+    var box = el("input", {
+      type: "search",
+      value: state.query || "",
+      placeholder: scopeNode ? "Search inside " + state.tree.label(scopeNode)
+                             : "Search names, values, or bytes",
+      "aria-label": "Search this save"
+    });
+    box.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        go({ query: box.value, scope: scopeNode ? scopeNode.start : null });
+      }
+    });
+
+    return el("div", { class: "toolbar" }, [
+      el("div", { class: "search" }, [
+        box,
+        el("button", {
+          class: "btn quiet",
+          text: "Search",
+          onclick: function () { go({ query: box.value, scope: scopeNode ? scopeNode.start : null }); }
+        })
+      ]),
+      el("button", {
+        class: "btn quiet",
+        text: "Download original",
+        onclick: function () { download(state.data, state.name); }
+      }),
+      el("button", {
+        class: "btn quiet",
+        text: "Open a different save",
+        onclick: function () { state.data = null; state.tree = null; renderUpload(); }
+      })
+    ]);
+  }
+
+  function render() {
+    if (!state.tree) {
+      renderUpload();
+      return;
+    }
+
+    var list = sections();
+    if (!state.tab) state.tab = list.length ? list[0].id : "all";
+
+    var stats = state.tree.stats();
+    app.innerHTML = "";
+
+    var readout = el("div", { class: "readout" }, [
+      el("b", { text: state.name }),
+      el("span", { class: "sep", text: "/" }),
+      stats.bytes.toLocaleString() + " bytes",
+      el("span", { class: "sep", text: "/" }),
+      plural(stats.values, "value"),
+      el("span", { class: "sep", text: "/" }),
+      plural(stats.dumps, "section")
+    ]);
+    if (stats.trailing) {
+      readout.appendChild(el("span", { class: "sep", text: "/" }));
+      readout.appendChild(document.createTextNode(stats.trailing + " trailing bytes ignored"));
+    }
+    app.appendChild(readout);
+    app.appendChild(renderToolbar());
+    app.appendChild(renderTabs(list));
+
+    if (state.query) {
+      app.appendChild(renderSearch());
+    } else if (state.tab === "changes") {
+      app.appendChild(renderChanges());
+    } else if (state.tab === "all") {
+      app.appendChild(renderTree());
+    } else {
+      var section = list.filter(function (s) { return s.id === state.tab; })[0];
+      if (!section) {
+        state.tab = "all";
+        app.appendChild(renderTree());
+      } else {
+        var rows = sectionRows(section);
+        var panel = el("div", { class: "panel" }, [el("h2", { text: section.title })]);
+        panel.appendChild(renderRows(rows, false));
+        // Only the list-shaped tabs can overflow; the curated field list can't.
+        var total = rows.length;
+        if (section.kind === "indexed") total = section.node.children.length;
+        else if (section.kind === "node") total = state.tree.children(section.node).length;
+        if (total > rows.length) {
+          panel.appendChild(el("p", { class: "panel-note" }, [
+            "Showing the first " + rows.length + ". ",
+            el("a", {
+              href: "#",
+              text: "Browse the full list",
+              onclick: function (e) { e.preventDefault(); go({ tab: "all", at: section.node.start }); }
+            })
+          ]));
+        }
+        app.appendChild(panel);
+      }
+    }
+
+    app.appendChild(renderActionbar());
+    paintCounts();
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
