@@ -4,11 +4,14 @@ A static site for editing RPG Maker XP save files, with some presets built speci
 
 Everything runs in the browser. Your save is read by the page and never sent anywhere.
 
+
+
 ## Using it
 
-Open `rxdata-save-editor.html` - double-click it, or drag it into a browser window.
-That's the whole application: one file with the parser, the interface and the styles
-inside it. Nothing to install.
+Deployed to Github Pages: 
+
+
+To use locally: Download the .zip file and unzip it. Open the `rxdata-save-editor.html` in a browser to begin editing.
 
 
 ## Tabs
@@ -64,3 +67,12 @@ everywhere, since Marshal stores it once; names don't behave that way.
 The page can't tell a real item name from a typo. If you invent a name the game doesn't
 define, you get an item it doesn't recognise. Change one thing and load the save before
 doing a batch.
+
+## How was it built
+
+Built with the help of Opus
+
+Workflow:
+
+Ruby script to modify one value -> Ruby on Rails application to modify multiple -> Tests added -> Ported to Javascript
+
