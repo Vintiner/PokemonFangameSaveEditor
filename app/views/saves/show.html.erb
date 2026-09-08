@@ -1,0 +1,75 @@
+<% content_for :title, "#{@meta['filename']} — save editor" %>
+<% stats = @tree.stats %>
+<% scope_node = (@tab == "all" && @node && !@node.equal?(@tree.root)) ? @node : nil %>
+
+<div class="readout">
+  <b><%= @meta["filename"] %></b><span class="sep">/</span><%= number_with_delimiter(stats[:bytes]) %> bytes<span class="sep">/</span><%= pluralize(stats[:values], "value") %><span class="sep">/</span><%= pluralize(stats[:dumps], "section") %><% if stats[:trailing].positive? %><span class="sep">/</span><%= stats[:trailing] %> trailing bytes ignored<% end %>
+</div>
+
+<div class="toolbar">
+  <%= form_with url: save_search_path(@id), method: :get, class: "search" do %>
+    <% if scope_node %><%= hidden_field_tag :scope, scope_node.id %><% end %>
+    <%= search_field_tag :q, nil,
+          placeholder: scope_node ? "Search inside #{@tree.label(scope_node)}" : "Search names, values, or bytes",
+          "aria-label": "Search this save" %>
+    <%= submit_tag "Search", class: "btn quiet" %>
+  <% end %>
+  <%= link_to "Download original", save_original_path(@id), class: "btn quiet" %>
+  <%= link_to "Upload a different save", root_path, class: "btn quiet" %>
+</div>
+
+<%= render "tabs" %>
+
+<% if @tab == "changes" %>
+  <%= render "changes" %>
+<% elsif @tab == "all" %>
+  <div class="crumbs">
+    <% @breadcrumbs.each_with_index do |crumb, i| %>
+      <% if i.positive? %><span>/</span><% end %>
+      <% if crumb.equal?(@node) %>
+        <b><%= @tree.label(crumb) %></b>
+      <% else %>
+        <%= link_to @tree.label(crumb), save_path(@id, at: crumb.id) %>
+      <% end %>
+    <% end %>
+    <% unless @node.equal?(@tree.root) %>
+      <span class="offset">bytes <%= @node.start %>–<%= @node.finish - 1 %></span>
+    <% end %>
+  </div>
+
+  <%= form_with url: save_edits_path(@id), method: :post, id: "edits-form", data: { autosave: true } do %>
+    <%= hidden_field_tag :next, "" %>
+    <%= hidden_field_tag :tab, "all" %>
+    <%= hidden_field_tag :at, params[:at] %>
+    <div class="panel">
+      <h2><%= @tree.label(@node) %> — <%= Rxdata::Presenter.type_label(@node) %></h2>
+      <% if @rows.any? %>
+        <%= render "rows", rows: @rows %>
+      <% else %>
+        <div class="panel-body">
+          <p class="lede">
+            This value has nothing inside it.
+            <%= link_to "Go back up", save_path(@id, at: @breadcrumbs[-2]&.id) %>.
+          </p>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <%= form_with url: save_edits_path(@id), method: :post, id: "edits-form", data: { autosave: true } do %>
+    <%= hidden_field_tag :next, "" %>
+    <%= hidden_field_tag :tab, @tab %>
+    <div class="panel">
+      <h2><%= @section[:title] %></h2>
+      <%= render "rows", rows: @section[:rows] %>
+      <% if @section[:truncated] %>
+        <p class="panel-note">
+          Showing the first <%= @section[:rows].size %>.
+          <%= link_to "Browse the full list", save_path(@id, at: @section[:node].id) %>.
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<%= render "actionbar", back: { tab: @tab, at: params[:at] }.compact %>

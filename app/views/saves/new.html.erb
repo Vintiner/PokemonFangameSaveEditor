@@ -1,0 +1,24 @@
+<% content_for :title, "Save editor for .rxdata files" %>
+
+<div class="panel">
+  <h2>Open a save file</h2>
+  <div class="panel-body lede">
+    <p>
+      Upload an <code>.rxdata</code> file and you can browse everything inside it and change
+      the values you care about — money, variables, switches, names, party data.
+      Nothing is written until you download the patched copy.
+    </p>
+
+    <%= form_with url: saves_path, method: :post, multipart: true do %>
+      <p><%= file_field_tag :save, accept: ".rxdata,.rvdata,.rvdata2,application/octet-stream" %></p>
+      <p><%= submit_tag "Open save file", class: "btn" %></p>
+    <% end %>
+  </div>
+  <p class="panel-note">
+    Files are held in temporary storage for up to six hours so you can edit them, then deleted.
+    Keep your own backup of the original before replacing it in the game.
+  </p>
+</div>
+
+
+</div>

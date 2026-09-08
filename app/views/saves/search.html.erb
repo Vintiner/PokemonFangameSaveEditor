@@ -1,0 +1,40 @@
+<% content_for :title, "Search — #{@meta['filename']}" %>
+
+<div class="toolbar">
+  <%= form_with url: save_search_path(@id), method: :get, class: "search" do %>
+    <% if @scope %><%= hidden_field_tag :scope, @scope.id %><% end %>
+    <%= search_field_tag :q, @query,
+          placeholder: @scope ? "Search inside #{@tree.label(@scope)}" : "Search names, values, or bytes",
+          "aria-label": "Search this save" %>
+    <%= submit_tag "Search", class: "btn quiet" %>
+  <% end %>
+  <%= link_to "Back to the file", save_path(@id), class: "btn quiet" %>
+</div>
+
+<div class="crumbs">
+  <% if @scope %>
+    Searching inside <b><%= @tree.path_string(@scope) %> / <%= @tree.label(@scope) %></b>
+    — <%= link_to "search the whole file instead", save_search_path(@id, q: @query) %>
+  <% else %>
+    Searching the whole file. Try a name, a value, <code>byte 15644</code>, <code>0x3D1C</code>, or a run of hex like <code>69 27 69</code>.
+  <% end %>
+</div>
+
+<%= form_with url: save_edits_path(@id), method: :post, id: "edits-form", data: { autosave: true } do %>
+    <%= hidden_field_tag :next, "" %>
+  <%= hidden_field_tag :return_to, "search" %>
+  <%= hidden_field_tag :q, @query %>
+  <% if @scope %><%= hidden_field_tag :scope, @scope.id %><% end %>
+
+  <div class="panel">
+    <h2><%= pluralize(@results.size, "match") %> for <%= @query.inspect %></h2>
+    <% if @results.any? %>
+      <%= render "rows", rows: @results, show_path: true %>
+      <p class="panel-note">Matches are capped at 200. Narrow the search if what you want isn't here.</p>
+    <% else %>
+      <div class="panel-body"><p class="lede">Nothing matched. Try part of a name, a value you can see in the game, or a byte offset.</p></div>
+    <% end %>
+  </div>
+<% end %>
+
+<%= render "actionbar", back: { return_to: "search", q: @query, scope: @scope&.id }.compact %>

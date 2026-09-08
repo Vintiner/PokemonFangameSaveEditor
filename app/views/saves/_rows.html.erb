@@ -1,0 +1,49 @@
+<% show_path = local_assigns.fetch(:show_path, false) %>
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col">Type</th>
+      <th scope="col">Value</th>
+      <th scope="col">Location</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% rows.each do |row| %>
+      <tr class="<%= row_state(row) %>">
+        <td class="name">
+          <% if row[:container] %>
+            <%= link_to row[:label], save_path(@id, at: row[:offset]) %>
+          <% else %>
+            <%= row[:label] %>
+          <% end %>
+          <% if show_path && row[:path].present? %>
+            <%= render "path", parts: row[:path] %>
+          <% end %>
+        </td>
+        <td class="type"><%= row[:type] %></td>
+        <td>
+          <% if row[:editable] %>
+            <% if %i[true false].include?(row[:target].kind) %>
+              <%= select_tag "values[#{row[:offset]}]",
+                    options_for_select([["true", "true"], ["false", "false"]], row[:value].to_s) %>
+            <% else %>
+              <%= text_field_tag "values[#{row[:offset]}]", row[:value], autocomplete: "off" %>
+            <% end %>
+            <% if row[:pending] %>
+              <span class="was">was <%= truncate_value(Rxdata::Presenter.input_value(row[:target]), 40) %></span>
+            <% end %>
+          <% else %>
+            <span class="value-mono"><%= truncate_value(row[:summary]) %></span>
+          <% end %>
+        </td>
+        <td class="offset">
+          <%= offset_tag(row[:offset]) %>
+          <% unless row[:container] || row[:offset].negative? %>
+            <span class="offset-hex"><%= "0x%X" % row[:offset] %></span>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

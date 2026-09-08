@@ -1,0 +1,18 @@
+<% back = local_assigns.fetch(:back, {}) %>
+<div class="actionbar">
+  <span class="count">
+    <% if @edits.any? %>
+      <% included = @edits.count { |_, entry| entry["enabled"] } %>
+      <b><%= pluralize(included, "change") %></b> will be applied<% if included < @edits.size %>, <%= @edits.size - included %> held back<% end %>.
+    <% else %>
+      Changes save as you make them.
+    <% end %>
+  </span>
+  <noscript>
+    <%= submit_tag "Apply changes on this screen", class: "btn quiet", form: "edits-form" %>
+  </noscript>
+  <%= link_to "Download patched save", save_download_path(@id), class: "btn" %>
+  <% if @edits.any? %>
+    <%= button_to "Discard all", save_revert_path(@id), method: :post, class: "btn link", params: back %>
+  <% end %>
+</div>

@@ -1,0 +1,52 @@
+<div class="panel">
+  <h2>Pending changes</h2>
+  <% if @changes.any? %>
+    <%= form_with url: save_changes_path(@id), method: :post, id: "changes-form", data: { autosave: true } do %>
+    <%= hidden_field_tag :next, "" %>
+      <%= hidden_field_tag :tab, "changes" %>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Include</th>
+            <th scope="col">Value</th>
+            <th scope="col">Change</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @changes.each do |change| %>
+            <tr class="row<%= ' muted' unless change[:enabled] %>">
+              <td>
+                <%= check_box_tag "enabled[#{change[:offset]}]", "1", change[:enabled],
+                      id: "enabled-#{change[:offset]}",
+                      "aria-label": "Include the change to #{change[:label]}" %>
+              </td>
+              <td class="name">
+                <%= link_to change[:label], save_path(@id, at: change[:offset]) %>
+                <%= render "path", parts: change[:path] %>
+              </td>
+              <td class="value-mono">
+                <span class="was-inline"><%= truncate_value(change[:was], 40) %></span>
+                <span class="arrow">→</span>
+                <b><%= truncate_value(change[:now], 40) %></b>
+                <span class="offset">byte <%= change[:offset] %></span>
+              </td>
+              <td>
+                <button type="submit" name="remove" value="<%= change[:offset] %>" class="btn link">Remove</button>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <noscript>
+        <div class="panel-body">
+          <%= submit_tag "Update which changes are included", class: "btn quiet" %>
+        </div>
+      </noscript>
+    <% end %>
+  <% else %>
+    <div class="panel-body">
+      <p class="lede">No changes yet. Edit a value on any tab and it will be listed here.</p>
+    </div>
+  <% end %>
+</div>
