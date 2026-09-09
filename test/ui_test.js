@@ -100,7 +100,7 @@ function button(label) {
     text().includes("19017 values") || "count missing");
 
   console.log("\n== tabs ==");
-  ["Trainer", "Player", "Badges", "Bag", "Variables", "Switches", "All data", "Changes"]
+  ["Trainer", "Player", "Badges", "Party", "Bag", "Variables", "Switches", "All data", "Changes"]
     .forEach((title) => {
       check("there is a " + JSON.stringify(title) + " tab", () => !!tab(title) || "missing");
     });
@@ -148,6 +148,15 @@ function button(label) {
     rowFor("Variable 16").querySelector("input").value === "55" || "value lost");
   check("the change is still counted", () =>
     doc.querySelector(".actionbar .count").textContent.includes("1 change") || "count lost");
+
+  console.log("\n== the party ==");
+  click(tab("Party"));
+  check("the party tab lists a first slot", () => !!rowFor("Slot 1") || "no slot rows");
+  check("the first slot names what it holds", () =>
+    rowFor("Slot 1").querySelector(".name").textContent.trim().length > "Slot 1".length ||
+    "slot has no name");
+  click(rowFor("Slot 1").querySelector("a"));
+  check("a slot can be opened", () => text().includes("species") || "no drill-down");
 
   console.log("\n== the bag ==");
   click(tab("Bag"));

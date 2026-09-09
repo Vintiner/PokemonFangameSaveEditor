@@ -104,7 +104,7 @@ input[type="text"], input[type="search"], select { font-family: var(--mono); fon
 <div class="shell">
   <div class="masthead">
     <h1>Save editor</h1>
-    <p>Edit values inside RPG Maker XP <code>.rxdata</code> saves - entirely in your browser</p>
+    <p>Edit values inside RPG Maker XP <code>.rxdata</code> saves — entirely in your browser</p>
   </div>
   <div id="app"></div>
 </div>
@@ -910,6 +910,48 @@ input[type="text"], input[type="search"], select { font-family: var(--mono); fon
     return array && array.kind === "array" ? array : null;
   }
 
+  var PARTY_LIMIT = 60; // a party is six, but a save this page has never seen might not be
+
+  function follow(tree, node) {
+    var hops = 0;
+    while (node && node.kind === "link" && hops < 8) {
+      node = tree.scanner.objects[node.ref];
+      hops += 1;
+    }
+    return node || null;
+  }
+
+  /* A party sits on the player, but the shape - an array held in @party - is
+   * enough to find it in a save this page has never seen. */
+  function partyList(tree, trainer) {
+    var party = trainer ? ivarOf(trainer, "@party") : null;
+    if (party && party.kind === "array") return party;
+    var owner = findObject(tree, function (node) {
+      var list = ivarOf(node, "@party");
+      return list && list.kind === "array" && list.children.length > 0;
+    });
+    return owner ? ivarOf(owner, "@party") : null;
+  }
+
+  /* "43 fields" tells you nothing about which slot you are opening, so name
+   * each one after its nickname, or failing that its species. Both are missing
+   * often enough that the slot number has to stand on its own. */
+  function slotLabel(tree, node, index) {
+    var label = "Slot " + (index + 1);
+    var mon = follow(tree, node);
+    if (!mon || !mon.children.length) return label;
+
+    var nickname = ivarOf(mon, "@name") || ivarOf(mon, "@nickname");
+    if (nickname) nickname = effective(nickname);
+    var species = ivarOf(mon, "@species");
+
+    var name = null;
+    if (nickname && nickname.kind === "string" && nickname.value) name = nickname.value;
+    else if (species && isSymbol(species)) name = species.value;
+    else if (species && species.kind === "int") name = "species " + species.value;
+    return name ? label + " - " + name : label;
+  }
+
   /* The parts people actually came to change, found by the shape of what they
    * hold rather than by save format version. */
   function highlights(tree) {
@@ -936,6 +978,18 @@ input[type="text"], input[type="search"], select { font-family: var(--mono); fon
       if (badges && badges.kind === "array") {
         sections.push({ id: "badges", title: "Badges", kind: "indexed", node: badges, prefix: "Badge" });
       }
+    }
+
+    var party = partyList(tree, trainer);
+    if (party && party.children.length) {
+      sections.push({
+        id: "party",
+        title: "Party",
+        kind: "fields",
+        fields: party.children.slice(0, PARTY_LIMIT).map(function (pair, i) {
+          return { label: slotLabel(tree, pair[1], i), node: pair[1] };
+        })
+      });
     }
 
     var bag = trainer ? ivarOf(trainer, "@bag") : null;

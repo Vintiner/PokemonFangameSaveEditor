@@ -17,8 +17,10 @@ To use locally: Download the .zip file and unzip it. Open the `rxdata-save-edito
 ## Tabs
 
 **Trainer** is a curated pick of the fields people usually want; **Player** is the same
-object in full. **Bag**, **Badges**, **Variables** and **Switches** are found by shape
-rather than by save format version, and are simply absent when a save has no such thing.
+object in full. **Party**, **Bag**, **Badges**, **Variables** and **Switches** are found
+by shape rather than by save format version, and are simply absent when a save has no
+such thing. Party slots are named after the nickname or species they hold, and each one
+opens into the Pokémon itself.
 **All data** is the whole tree, and **Changes** lists what you have pending, where each
 one can be held back or removed.
 
@@ -44,12 +46,15 @@ src/style.css   styles
 build.js        inlines the three into build/index.html
 test/engine_test.js  checks the engine against a reference Ruby implementation
 test/ui_test.js      drives the built page in a headless DOM
+test/make_fixture.js writes a small synthetic save
+test/party_test.js   checks the Party tab against that fixture
 ```
 
 ```bash
 node build.js
 node test/engine_test.js path/to/save.rxdata   # needs Ruby, for the comparison
 node test/ui_test.js     path/to/save.rxdata   # needs: npm install jsdom
+node test/make_fixture.js && node test/party_test.js   # no save file needed
 ```
 
 The engine tests apply the same edits with both this JavaScript engine and the Ruby
