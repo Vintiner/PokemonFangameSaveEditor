@@ -8,7 +8,7 @@ Everything runs in the browser. Your save is read by the page and never sent any
 
 ## Using it
 
-Deployed to Github Pages: 
+Deployed to Github Pages: https://vintiner.github.io/PokemonFangameSaveEditor/
 
 
 To use locally: Download the .zip file and unzip it. Open the `rxdata-save-editor.html` in a browser to begin editing.
